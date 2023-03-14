@@ -1,7 +1,9 @@
 package MultithreadProgrammingCore.atomicClass;
 
+import java.sql.SQLOutput;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.*;
 
 /**
  * 原子类介绍
@@ -107,13 +109,135 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * 如果想以普通变量的方式来设定值 那么可以使用lazySet()方法 这样就不采用volatile的立即可见机制了
  *
+ *                  AtomicInteger integer = new AtomicInteger(1);
+ *                  integer.lazySet(2);
  *
+ * 除了基本类的原子类以外 基本类型的数组类型也有原子类:
  *
+ *      > AtomicIntegerArray: 原子更新int数组
+ *      > AtomicLongArray: 原子更新long数组
+ *      > AtomicReferenceArray: 原子更新引用数组
  *
+ * 其实原子数组和原子类型一样的 不过我们可以对数组内的元素进行原子操作:
+ *
+ *                  public static void main(String[] args) throws InterruptedException {
+ *
+ *                      AtomicIntegerArray array = new AtomicIntegerArray(new int[]{0, 4, 1, 3, 5});
+ *                      Runnable r = () -> {
+ *                          for (int i = 0; i < 100000; i++) array.getAndAdd(0, 1);
+ *                      };
+ *                      new Thread(r).start();
+ *                      new Thread(r).start();
+ *                      try {
+ *                          TimeUnit.SECONDS.sleep(1);
+ *                      } catch (InterruptedException e) {
+ *                          throw new RuntimeException(e);
+ *                      }
+ *                      System.out.println(array.get(0));
+ *
+ *                  }
+ *
+ * 在JDK8之后 新增了DoubleAdder和LongAdder 在高并发情况下 LongAdder的性能比AtomicLong的性能更好 主要体现在自增上 它的大致原理如下:
+ *
+ *      在低并发情况下 和AtomicLong是一样的 对value值进行CAS操作 但是出现高并发的情况时 AtomicLong会进行大量的循环操作来保证同步
+ *      而LongAdder会将对value值的CAS操作分散为对数组cells中多个元素的CAS操作(内部维护了一个Cell[] as数组 每个Cell里面有一个初始值为0的long型变量
+ *      在高并发时会进行分散CAS 就是不同的线程可以对数组中不同的元素进行CAS自增 这样就避免了所有线程都对同一个值进行CAS) 只需要最后再将结果加起来即可
+ *
+ *              https://img-blog.csdnimg.cn/img_convert/8489be69eb5e0cdbc9748a70556250ad.png
+ *
+ * 使用如下:
+ *                  public static void main(String[] args) {
+ *
+ *                       LongAdder adder = new LongAdder();
+ *                       Runnable r = () -> {
+ *                           for (int i = 0; i < 100000; i++) adder.add(1);
+ *                       };
+ *                       for (int i = 0; i < 100; i++) new Thread(r).start(); // 100个线程
+ *                       try {
+ *                           TimeUnit.SECONDS.sleep(1);
+ *                       } catch (InterruptedException e) {
+ *                           throw new RuntimeException(e);
+ *                       }
+ *                       System.out.println(adder.sum()); // 最后求和即可
+ *
+ *                  }
+ *
+ * 由于底层源码比较复杂 这里就不做讲解了 两者的性能对比(这里用到了CountDownLatch 建议学完之后再来看):
+ *
+ *                  private static long LongAdderTest() {
+ *
+ *                      CountDownLatch latch = new CountDownLatch(100);
+ *                      LongAdder adder = new LongAdder();
+ *                      long timeStart = System.currentTimeMillis();
+ *                      Runnable r = () -> {
+ *                          for (int i = 0; i < 100000; i++) adder.add(1);
+ *                          latch.countDown();
+ *                      };
+ *                      for (int i = 0; i < 100; i++) new Thread(r).start();
+ *                      try {
+ *                          latch.await();
+ *                      } catch (InterruptedException e) {
+ *                          throw new RuntimeException(e);
+ *                      }
+ *                      return System.currentTimeMillis() - timeStart;
+ *
+ *                  }
+ *
+ *                  private static long AtomicIntegerTest() {
+ *
+ *                      CountDownLatch latch = new CountDownLatch(100);
+ *                      AtomicInteger integer = new AtomicInteger();
+ *                      long timeStart = System.currentTimeMillis();
+ *                      Runnable r = () -> {
+ *                          for (int i = 0; i < 100000; i++) integer.incrementAndGet();
+ *                          latch.countDown();
+ *                      };
+ *                      for (int i = 0; i < 100; i++) new Thread(r).start();
+ *                      try {
+ *                          latch.await();
+ *                      } catch (InterruptedException e) {
+ *                          throw new RuntimeException(e);
+ *                      }
+ *                      return System.currentTimeMillis() - timeStart;
+ *
+ *                  }
+ *
+ * 除了对基本数据类型支持原子操作外 对于引用类型 也是可以实现原子操作的:
+ *
+ *                  public static void main(String[] args) {
+ *
+ *                      String a = "Hello";
+ *                      String b = "World";
+ *                      AtomicReference<String> reference = new AtomicReference<>(a);
+ *                      reference.compareAndSet(a, b);
+ *                      System.out.println(reference.get());
+ *
+ *                  }
+ *
+ * JUC还提供了字段原子更新器 可以对类中的某个字段进行原子操作(注意: 字段必须添加volatile关键字):
+ *
+ *                  public class Main {
+ *
+ *                      public static void main(String[] args) {
+ *
+ *                          Student student = new Student();
+ *                          AtomicIntegerFileUpdater<Student> filedUpdate =
+ *                                  AtomicIntegerFiledUpdater.newUpdater(Student.class, "age");
+ *                          System.out.println(filedUpdater.incrementAndGet(student));
+ *
+ *                      }
+ *
+ *                      public static class Student {
+ *                          volatile int age;
+ *                      }
+ *
+ *                  }
+ *
+ * 了解了这么多原子类 是不是感觉要实现保证原子性的工作更加轻松了?
  */
 public class Main {
 
-    private static AtomicInteger i = new AtomicInteger(0);
+    private static final AtomicInteger i = new AtomicInteger(0);
 
     static void test1() {
 
@@ -123,7 +247,7 @@ public class Main {
         /*AtomicInteger i = new AtomicInteger(1);
         System.out.println(i.getAndIncrement());*/
 
-        Runnable r = () -> {
+        /*Runnable r = () -> {
             for (int j = 0; j < 100000; j++)
                 i.getAndIncrement();
             System.out.println("自增完成");
@@ -135,23 +259,108 @@ public class Main {
             System.out.println(i.get());
         } catch (InterruptedException e) {
             e.printStackTrace();
-        }
+        }*/
+
+        /*AtomicInteger integer = new AtomicInteger(10);
+        System.out.println(integer.compareAndSet(30, 20));
+        System.out.println(integer.compareAndSet(10, 20));
+        System.out.println(integer);*/
+
+        AtomicInteger integer = new AtomicInteger(1);
+        integer.lazySet(2);
+        System.out.println(integer);
 
     }
 
     static void test2() {
 
-        AtomicInteger integer = new AtomicInteger(10);
-        System.out.println(integer.compareAndSet(30, 20));
-        System.out.println(integer.compareAndSet(10, 20));
-        System.out.println(integer);
+        /*AtomicIntegerArray array = new AtomicIntegerArray(new int[]{0, 4, 1, 3, 5});
+        Runnable r = () -> {
+            for (int i = 0; i < 100000; i++) array.getAndAdd(1, 1);
+        };
+        new Thread(r).start();
+        new Thread(r).start();
+        try {
+            TimeUnit.SECONDS.sleep(1);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        System.out.println(array);*/
+
+        LongAdder adder = new LongAdder();
+        Runnable r = () -> {
+            for (int i = 0; i < 100000; i++) adder.add(1);
+        };
+        for (int i = 0; i < 100; i++) new Thread(r).start();
+        try {
+            TimeUnit.SECONDS.sleep(1);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        System.out.println(adder.sum());
+
+    }
+
+    static void test3() {
+
+        /*String a = "Hello"; String b = "World";
+        AtomicReference<String> reference = new AtomicReference<>(a);
+        reference.compareAndSet(a, b);
+        System.out.println(reference.get());*/
+
+        Student student = new Student();
+        AtomicIntegerFieldUpdater<Student> fieldUpdater =
+                AtomicIntegerFieldUpdater.newUpdater(Student.class, "age");
+        System.out.println(fieldUpdater.incrementAndGet(student));
 
     }
 
     public static void main(String[] args) {
 
         //test1();
-        test2();
+        //test2();
+        test3();
+
+        /*System.out.println("使用AtomicLong的时间消耗: " + AtomicIntegerTest() + "ms");
+        System.out.println("使用LongAdder的时间消耗: " + LongAdderTest() + "ms");*/
+
+    }
+
+    private static long LongAdderTest() {
+
+        CountDownLatch latch = new CountDownLatch(100);
+        LongAdder adder = new LongAdder();
+        long timeStart = System.currentTimeMillis();
+        Runnable r = () -> {
+            for (int i = 0; i < 100000; i++) adder.add(1);
+            latch.countDown();
+        };
+        for (int i = 0; i < 100; i++) new Thread(r).start();
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        return System.currentTimeMillis() - timeStart;
+
+    }
+
+    private static long AtomicIntegerTest() {
+
+        CountDownLatch latch = new CountDownLatch(100);
+        AtomicInteger integer = new AtomicInteger();
+        long timeStart = System.currentTimeMillis();
+        Runnable r = () -> {
+            for (int i = 0; i < 100000; i++) integer.addAndGet(1);
+            latch.countDown();
+        };
+        for (int i = 0; i < 100; i++) new Thread(r).start();
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        return System.currentTimeMillis() - timeStart;
 
     }
 
