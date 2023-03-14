@@ -1,4 +1,4 @@
-package MultitHreading.lockingMechanism;
+package Multithreading.lockingMechanism;
 
 /**
  * 在谈锁机制

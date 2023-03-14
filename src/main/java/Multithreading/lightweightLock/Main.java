@@ -1,4 +1,4 @@
-package MultitHreading.lightweightLock;
+package Multithreading.lightweightLock;
 
 /**
  * 轻量级锁

@@ -1,4 +1,4 @@
-package MultitHreading.heavyweightLock;
+package Multithreading.heavyweightLock;
 
 /**
  * 重量级锁

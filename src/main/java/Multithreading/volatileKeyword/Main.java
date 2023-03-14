@@ -1,4 +1,4 @@
-package MultitHreading.volatileKeyword;
+package Multithreading.volatileKeyword;
 
 /**
  * volatile关键字

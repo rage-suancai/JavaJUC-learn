@@ -1,4 +1,4 @@
-package MultitHreading.theHappens_BeforePrinciple;
+package Multithreading.theHappens_BeforePrinciple;
 
 /**
  * happens-before原则

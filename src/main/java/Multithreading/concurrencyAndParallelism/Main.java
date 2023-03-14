@@ -1,4 +1,4 @@
-package MultitHreading.concurrencyAndParallelism;
+package Multithreading.concurrencyAndParallelism;
 
 /**
  * 并发与并行

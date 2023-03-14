@@ -1,4 +1,4 @@
-package MultithreadProgrammingCore.LockAndConditionInterfaces;
+package MultithreadProgrammingCore.lockAndConditionInterfaces;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Condition;

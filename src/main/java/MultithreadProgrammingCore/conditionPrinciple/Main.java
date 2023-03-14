@@ -1,4 +1,4 @@
-package MultithreadProgrammingCore.ConditionPrinciple;
+package MultithreadProgrammingCore.conditionPrinciple;
 
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;

@@ -1,4 +1,4 @@
-package MultitHreading.reorder;
+package Multithreading.reorder;
 
 /**
  * 重排序

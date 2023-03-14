@@ -1,4 +1,4 @@
-package MultitHreading.deflectionLock;
+package Multithreading.deflectionLock;
 
 /**
  * 偏向锁

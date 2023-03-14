@@ -1,4 +1,4 @@
-package MultitHreading.jmm_MemoryModel;
+package Multithreading.jmm_MemoryModel;
 
 /**
  * JMM内存模型
