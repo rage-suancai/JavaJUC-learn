@@ -51,8 +51,56 @@
 
 实际上await()方法比较中规中矩 大部分操作也在我们的意料之中 那么我们接着来看signal()方法是如何实现的 同样的 为了防止各位绕晕 先明确signal的目标:
 - 只有持有锁的线程才能唤醒锁所属的Condition等待的线程
-- 
-- 
-- 
+- 优先唤醒条件队列中的第一个 如果唤醒过程中出现问题 接着找往下找 直到找到一个可以唤醒的
+- 唤醒操作本质上是将条件队列中的结点直接丢进AQS等待队列中 让其参与到锁的竞争中
+- 拿到锁之后 线程才能恢复运行
 
+<img src="https://fast.itbaima.net/2023/03/06/UjG1Dd5xNJhIyWm.png">
 
+好了 上源码:
+
+                    public final void signal() {
+                        if (!isHeldExclusively()) // 先看看当前线程是不是持有锁的状态
+                            throw new IllegalMonitorStateException(); // 不是? 那你不配唤醒别人
+                        Node first = firstWaiter; // 获取条件队列的第一个结点
+                        if (first != null) // 如果队列不为空 获取到了 那么就可以开始唤醒操作
+                            doSignal(first);
+                    }
+
+                    private void doSignal(Node first) {
+                        do {
+                            if ( (firstWaiter = first.nextWaiter) == null) // 如果当前节点在本轮循环没有后继节点了 条件队列就为空了
+                                lastWaiter = null; // 所以这里相当于是直接清空
+                            first.nextWaiter = null; // 将给定节点的下一个结点设置为null 因为当前结点马上就会离开条件队列了
+                        } while (!transferForSignal(first) && // 接着往下看
+                                 (first = firstWaiter) != null); // 能走到这里只能说明给定节点被设定为了取消状态 那就继续看下一个结点
+                    }
+
+                    final boolean transferForSignal(Node node) {
+                        // 如果这里CAS失败 那有可能此节点被设定为了取消状态
+                        if (!compareAndSetWaitStatus(node, Node.CONDITION, 0))
+                            return false;
+                    
+                        // CAS成功之后 结点的等待状态就变成了默认值0 接着通过enq方法直接将节点丢进AQS的等待队列中 相当于唤醒并且可以等待获取锁了
+                        // 这里enq方法返回的是加入之后等待队列队尾的前驱节点 就是原来的tail
+                        Node p = enq(node);
+                        int ws = p.waitStatus; // 保存前驱结点的等待状态
+                        // 如果上一个节点的状态为取消或者尝试设置上一个节点的状态为SIGNAL失败(可能是在ws>0判断完之后马上变成了取消状态 导致CAS失败)
+                        if (ws > 0 || !compareAndSetWaitStatus(p, ws, Node.SIGNAL))
+                            LockSupport.unpark(node.thread); // 直接唤醒线程
+                        return true;
+                    }
+
+其实最让人不理解的就是倒数第二行 明明上面都正常进入到AQS等待队列了 应该是可以开始走正常流程了 那么这里为什么还要提前来一次unpark呢?
+
+这里其实是为了进行优化而编写 直接unpark会有两种情况:
+- 如果插入结点前 AQS等待队列的队尾节点就已经被取消 则满足wc > 0
+- 如果插入node后 AQS内部等待队列的队尾节点已经稳定 满足tail.waitStatus == 0 但在执行ws > 0之后!compareAndSetWaitStatus(p, ws, Node.SIGNAL)之前被取消 则CAS也会失败 满足compareAndSetWaitStatus(p, ws, Node.SIGNAL) == false
+
+如果这里被提前unpark 那么在await()方法中将可以被直接唤醒 并跳出while循环 直接开始争抢锁 因为前一个等待结点是被取消的状态 没有必要再等它了
+
+所以 大致流程下:
+
+<img src="https://fast.itbaima.net/2023/03/06/w9hvtNyAM74pO8m.png">
+
+只要把整个流程理清楚 还是很好理解的

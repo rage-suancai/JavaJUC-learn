@@ -131,7 +131,7 @@
 
 注意在仅持有读锁的情况下去申请写锁 属于"锁升级" ReentrantReadWriteLock是不支持的:
 
-                    static void test8() {
+                    static void test() {
 
                         ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
                         lock.readLock().lock(); lock.writeLock().lock();
