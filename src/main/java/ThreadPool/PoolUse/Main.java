@@ -188,7 +188,7 @@ public class Main {
 
         ThreadPoolExecutor pool =
                 new ThreadPoolExecutor(2, 4,
-                        3, TimeUnit.SECONDS,
+                        3,TimeUnit.SECONDS,
                         new SynchronousQueue<>(),
                         new ThreadFactory() {
                             int counter = 0;
