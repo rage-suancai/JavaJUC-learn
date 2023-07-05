@@ -41,7 +41,7 @@ JDK5之后 我们可以使用ScheduledThreadPoolExecutor来提交定时任务 �
 
 我们也可以像之前一样 传入一个Callable对象 用于接收返回值:
 
-                    static void test2() throws ExecutionException, InterruptedException {
+                    static void test() throws ExecutionException, InterruptedException {
 
                         ScheduledThreadPoolExecutor pool = new ScheduledThreadPoolExecutor(2);
                 
@@ -56,7 +56,7 @@ JDK5之后 我们可以使用ScheduledThreadPoolExecutor来提交定时任务 �
 
 那么如果我们希望按照一定的频率不断执行任务呢?
 
-                    static void test3() {
+                    static void test() {
 
                         ScheduledThreadPoolExecutor pool = new ScheduledThreadPoolExecutor(2);
                         pool.scheduleAtFixedRate(() -> System.out.println("Hello Java😪"),
@@ -66,7 +66,7 @@ JDK5之后 我们可以使用ScheduledThreadPoolExecutor来提交定时任务 �
 
 Executors也为我们预置了newScheduledThreadPool方法用于创建线程池:
 
-                    static void test4() {
+                    static void test() {
 
                         ScheduledExecutorService pool = Executors.newScheduledThreadPool(1);
                         pool.schedule(() -> System.out.println("Hello Java😪"), 1,TimeUnit.SECONDS);
